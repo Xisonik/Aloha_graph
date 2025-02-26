@@ -503,7 +503,7 @@ class CLGRCENV(gym.Env):
         reward, terminated, truncated = self.get_reward(gt_observations)
         sources = ["time_out", "collision", "Nan"]
         source = "Nan"
-        self.memory.save_memory_as_grid()
+
         if not terminated:
             if self._is_timeout():
                 truncated = True #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!здесь почему-то был false
@@ -515,7 +515,6 @@ class CLGRCENV(gym.Env):
                 source = sources[1]
         
         if terminated or truncated:
-            self.memory.save_memory_as_grid()
             if not self.demonstrate:
                 self.get_success_rate(gt_observations, terminated, sources, source)
             self.start_step = True
