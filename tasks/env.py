@@ -21,6 +21,7 @@ import cv2
 
 from .control_manager import PID_controller, Control_module
 from .scene_manager import Scene_controller
+from .memory_manager import ImageMemoryManager
 
 sim_config = {
     "renderer": "RayTracedLighting",
@@ -80,33 +81,7 @@ from embed_nn import SceneEmbeddingNetwork
 import torch.optim as optim
 from collections import deque
 
-class ImageMemoryManager:
-    def __init__(self, n=5, img_size=(3, 400, 400), downscale_factor=2):
-        """
-        Класс для хранения последних n изображений в уменьшенном размере.
 
-        :param n: Количество сохраняемых изображений
-        :param img_size: Размер входных изображений (C, H, W)
-        :param downscale_factor: Во сколько раз уменьшать изображение
-        """
-        self.n = n
-        self.downscale_factor = downscale_factor
-        self.downscaled_size = (img_size[0], img_size[1] // downscale_factor, img_size[2] // downscale_factor)
-        self.memory = deque([torch.zeros(self.downscaled_size)] * n, maxlen=n)
-
-    def add_image(self, img):
-        """
-        Добавляет новое изображение в память, уменьшая его размер.
-        
-        :param img: Тензор изображения (C, H, W), значения [0,1]
-        """
-        img_pil = Image.fromarray((img.numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-        img_pil_resized = img_pil.resize((self.downscaled_size[2], self.downscaled_size[1]), Image.ANTIALIAS)
-        img_tensor = torch.tensor(np.array(img_pil_resized) / 255).permute(2, 0, 1)  # Преобразуем обратно в тензор
-        self.memory.append(img_tensor)
-
-    def get_memory(self):
-        return list(self.memory)
 
 
 
@@ -221,7 +196,13 @@ class CLGRCENV(gym.Env):
         
         gym.Env.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1.0, shape=(2,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-1000000000, high=1000000000, shape=(1542,), dtype=np.float32)
+        shape_size = 1542
+        self.use_memory = asdict(config).get('memory', None)
+        if self.use_memory:
+            self.memory = ImageMemoryManager()
+        if self.use_memory:
+            shape_size += 2048
+        self.observation_space = spaces.Box(low=-1000000000, high=1000000000, shape=(shape_size,), dtype=np.float32)
 
         self.max_velocity = 1.2
         self.max_angular_velocity = math.pi*0.4
@@ -262,10 +243,10 @@ class CLGRCENV(gym.Env):
         self.traning_radius = 0
         self.trining_delta_angle = 0
         self.max_traning_radius = 4
-        self.max_trining_angle = np.pi/6
+        self.max_trining_angle = np.pi
         self.amount_angle_change = 0
         self.amount_radius_change = 0
-        self.max_amount_angle_change = 4
+        self.max_amount_angle_change = 6
         self.max_amount_radius_change = 60
         self.num_of_envs = 0
         self.eval = asdict(config).get('eval', None)
@@ -459,14 +440,14 @@ class CLGRCENV(gym.Env):
         punish_time = self._get_punish_time()
 
         if not achievements[self.reward_modes[0]]:
-            reward = -2/self._max_episode_length
+            reward = 2*punish_time
         else:
             if not achievements[self.reward_modes[1]]:
-                reward = -1/self._max_episode_length
+                reward = punish_time
             else:
                 if self.reward_mode == 1:
                     terminated = True
-                    reward = 3
+                    reward = 5
                     return reward, terminated, truncated
                 else:
                     print("error in get_reward function!")
@@ -474,7 +455,7 @@ class CLGRCENV(gym.Env):
         return reward, terminated, truncated
     
     def _get_punish_time(self):
-        return 5*float(self._get_current_time())/float(self._max_episode_length)
+        return -0.2#self._max_episode_length
 
     def move(self, action):
         print("action type", type(action), action.shape, action)
@@ -522,18 +503,19 @@ class CLGRCENV(gym.Env):
         reward, terminated, truncated = self.get_reward(gt_observations)
         sources = ["time_out", "collision", "Nan"]
         source = "Nan"
-
+        self.memory.save_memory_as_grid()
         if not terminated:
             if self._is_timeout():
                 truncated = True #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!здесь почему-то был false
-                reward = reward - 4
+                reward = -5
                 source = sources[0]
             if self._is_collision() and self._get_current_time() > 2*self._skip_frame:
                 truncated = True
-                reward = reward - 5
+                reward = -6
                 source = sources[1]
         
         if terminated or truncated:
+            self.memory.save_memory_as_grid()
             if not self.demonstrate:
                 self.get_success_rate(gt_observations, terminated, sources, source)
             self.start_step = True
@@ -608,8 +590,12 @@ class CLGRCENV(gym.Env):
 
         correct_position = False
         while not correct_position:
-            self.traning_radius = self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
-            self.traning_angle = self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
+            eval = 1 if self.eval else 0
+            r = asdict(self.config).get('eval_radius', None)
+            start = 1.1
+            random_angle = 0#np.random.rand()*2*np.pi
+            self.traning_radius = start + eval*r + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
+            self.traning_angle = eval*random_angle + self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
             new_pos, new_angle, correct_position = self.scene_controller.get_robot_position(self.goal_position[0], self.goal_position[1], self.traning_radius, self.traning_angle)
             if not correct_position:
                 self.amount_radius_change += 1
@@ -617,7 +603,10 @@ class CLGRCENV(gym.Env):
         self.jetbot.set_world_pose(new_pos ,get_quaternion_from_euler(new_angle))
 
         get_prob_true = lambda x: np.random.rand() <= x
-        self.demonstrate = get_prob_true(0.15)
+        if self.eval or self.evalp:
+            self.demonstrate = get_prob_true(-1)
+        else:
+            self.demonstrate = get_prob_true(0.5)
         print("demonstrate: ", self.demonstrate)
         if self.demonstrate:
             self.controle_module.update(new_pos, self.goal_position, self.get_target_positions)
@@ -629,6 +618,16 @@ class CLGRCENV(gym.Env):
     
     def get_path(self):
         pass
+
+    def tensor_to_pil(self, image_tensor):
+        # Убедимся, что тензор находится в диапазоне [0, 255]
+        image_tensor = image_tensor.clamp(0, 255)
+        
+        # Преобразуем (C, H, W) → (H, W, C) и приводим к типу uint8
+        image_np = image_tensor.permute(1, 2, 0).byte().cpu().numpy()
+        
+        # Создаем изображение
+        return Image.fromarray(image_np, mode="RGB")
     
     def get_observations(self):
         self._my_world.render()
@@ -653,16 +652,31 @@ class CLGRCENV(gym.Env):
             img_current_emb_1 = self.clip_model.encode_image(img_current_1)
         event = self.event,
         if event == 1:
-            s = "target on right table"
+            s = "wall - 1"
         else:
-            s = "target on left table"
+            s = "wall - 2"
 
         text = clip.tokenize([s]).to(self.device)
         with torch.no_grad():
             text_features = self.clip_model.encode_text(text)
         # graph_embedding = self.get_graph_embedding()!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # print("embedding ", type(graph_embedding))
-
+        # print(img[0])
+        if self.use_memory:
+            self.memory.add(self.tensor_to_pil(img[0]))
+            mem = self.memory.get_embedding()
+            return np.concatenate(
+            [
+                jetbot_linear_velocity,
+                jetbot_angular_velocity,
+                # self.img_goal_emb[0].cpu(),
+                img_current_emb_0[0].cpu(),
+                img_current_emb_1[0].cpu(),
+                text_features[0].cpu(),
+                mem[0].cpu(),
+                # graph_embedding.cpu().detach().numpy(),
+            ]
+        )
         return np.concatenate(
             [
                 jetbot_linear_velocity,
@@ -717,3 +731,10 @@ class CLGRCENV(gym.Env):
                 cur_impulse = math.sqrt(cur_impulse)
             if num_contact_data > 1 or not self.scene_controller.no_intersect_with_obstacles(self.current_jetbot_position): #1 contact with flore here yet
                 self.collision = True
+
+    def get_env_info(self):  # <-- Этот метод нужен rl_games!
+        return {
+            "observation_space": self.observation_space,
+            "action_space": self.action_space,
+            "agents": 1  # Количество агентов
+        }
