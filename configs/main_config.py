@@ -9,7 +9,7 @@ general_path = str(d) + "/standalone_examples/Aloha_graph/Aloha"
 @dataclass
 class MainConfig:
     tuning: bool = False
-    headless: bool = False
+    headless: bool = True
     reward_mode: int = 1
     cup_usd_path: str = general_path + "/assets/objects/bowl.usd"
     jetbot_asset_path: str = general_path + "/assets/aloha/aloha.usd"
@@ -27,11 +27,12 @@ class MainConfig:
     scene_file_test: str = general_path + "/scene/scene_test/"
     scene_file_train: str = general_path + "/scene/scene_train/"
     load_policy: str = general_path + "/models/SAC/nav_with_memory_test1_340000_steps.zip"
-    eval:bool = True
+    eval:bool = False
     eval_radius:float = 2
     eval_angle:float = 0
     eval_print:bool = False
     eval_log_path: str = general_path + "/logs/eval_log.txt"
-    segmentation:bool = True
+    segmentation:bool = False
     memory:bool = False
     graph:bool=True
+    control:bool=True
