@@ -19,12 +19,12 @@ class Scene_controller:
 
     def _set_obstacle_position(self):
         self.obstacles.append(self._set_obstacle(self.obstacles_shape[2], [0.5, 5], 0, 0.5, 1))
-        self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [1.5, 3.5], 0.35))
-        # self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [2.2, 5.3], 0.2))
-        self.obstacles.append(self._set_obstacle(self.obstacles_shape[1], [3, 3.8], 0, 0.05, 0.5))
-        self.obstacles.append(self._set_obstacle(self.obstacles_shape[1], [5, 2.2], 0, 0.05, 0.5))
-        # self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [5.8, 0.7], 0.2))
-        self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [6.5, 2.5], 0.35))
+        self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [1, 3.5], 0.35))
+        self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [2.2, 5.3], 0.2))
+        self.obstacles.append(self._set_obstacle(self.obstacles_shape[1], [3, 3.5], 0, 0.05, 0.5))
+        self.obstacles.append(self._set_obstacle(self.obstacles_shape[1], [5, 2.5], 0, 0.05, 0.5))
+        self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [5.8, 0.7], 0.2))
+        self.obstacles.append(self._set_obstacle(self.obstacles_shape[0], [7, 2.5], 0.35))
         self.obstacles.append(self._set_obstacle(self.obstacles_shape[2], [7.5, 1], 0, 0.5, 1))
 
     def _set_obstacle(self, shape, position, radius=0, len_x=0, len_y=0, height=0.5):
@@ -54,12 +54,12 @@ class Scene_controller:
         return no_interect
 
     def get_target_position(self, event, eval, evalp):
-        poses_bowl = [[7.5, 1, 0.7], [0.5, 5, 0.7]]
+        poses_bowl = [[7.5, 1, 0.7],[7.5, 0.8, 0.7],[7.5, 1.2, 0.7], [0.5, 4.8, 0.7],[0.5, 5.2, 0.7],[0.5, 5, 0.7]]
         
         if event == 0:
-            num_of_envs = 0#np.random.choice([1,2,3,4])
+            num_of_envs = np.random.choice([0,1,2])
         elif event == 1:
-            num_of_envs = 1#np.random.choice([5,6,7,8,9])
+            num_of_envs = np.random.choice([3,4,5])
 
         if not eval and not evalp:
             goal_position = poses_bowl[num_of_envs]
@@ -71,7 +71,7 @@ class Scene_controller:
 
     def get_robot_position(self, x_goal, y_goal, traning_radius=0, traning_angle=0):
         # return [4,3,0], -np.pi
-        traning_radius_start = 1.2
+        traning_radius_start = 0
         k = 0
         self.change_line += 1
         reduce_r = 1
@@ -96,12 +96,14 @@ class Scene_controller:
             to_goal_vec = goal_world_position - robot_pos[0:2]
             
             cos_angle = np.dot(to_goal_vec, nx) / np.linalg.norm(to_goal_vec) / np.linalg.norm(nx)
+            n = np.random.randint(2)
             
             quadrant = self._get_quadrant(nx, ny, to_goal_vec)
+            return [4,3,0], quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
             if self.no_intersect_with_obstacles(robot_pos[0:2], 0.25) and robot_pos[0] < 7.5-self.robot_r and robot_pos[0] > 0.5+self.robot_r and robot_pos[1] < 5.5-self.robot_r and robot_pos[1] > 0.5+self.robot_r:
                 n = np.random.randint(2)
                 return robot_pos, quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
-            elif k >= 70:
+            elif k >= 300:
                 print("can't get correct robot position: ", robot_pos, quadrant*np.arccos(cos_angle) + reduce_phi*traning_angle, reduce_r)
                 return 0, 0, False
                   
