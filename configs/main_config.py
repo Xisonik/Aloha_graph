@@ -34,3 +34,4 @@ class MainConfig:
     eval_log_path: str = general_path + "/logs/eval_log.txt"
     segmentation:bool = True
     memory:bool = False
+    graph:bool=True
