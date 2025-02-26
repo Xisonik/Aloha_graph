@@ -62,6 +62,7 @@ class Control_module:
         self.ferst_ep = True
         self.G = self.get_scene_grid()
         self.dijkstra_first_calling = True
+        self.first = True
     
     def update(self, current_position, target_position, targets_positions):
         self.ferst_ep = True
@@ -193,7 +194,8 @@ class Control_module:
 
         semple_path = self.remove_zigzags(grid_path)
         trinned_grid_path = self.remove_straight_segments(semple_path)
-        if save_to_disk:
+        if save_to_disk or self.first:
+            self.first = False
             self.save_to_disk(trinned_grid_path, grid_path)
         
         self.path = []
@@ -239,7 +241,7 @@ class Control_module:
         print("f0")
         room_len_x = 8
         room_len_y = 6
-        ratio = 8 # 1m/4 = 0.25m
+        ratio = 10 # 1m/4 = 0.25m
         self.ratio = ratio
         ratio_x = ratio*room_len_x
         ratio_y = ratio*room_len_y
@@ -249,7 +251,7 @@ class Control_module:
         G = self._create_grid_with_diagonals(ratio_x, ratio_y)
         for edge in G.edges:
             node_1, node_2 = edge
-            if not scene_controller.no_intersect_with_obstacles(np.array([node_1[0]/ratio,node_1[1]/ratio]),add_r = 0.1) or not scene_controller.no_intersect_with_obstacles(np.array([node_2[0]/ratio,node_2[1]/ratio]), add_r = 0.1):
+            if not scene_controller.no_intersect_with_obstacles(np.array([node_1[0]/ratio,node_1[1]/ratio]),add_r = 0.1) or not scene_controller.no_intersect_with_obstacles(np.array([node_2[0]/ratio,node_2[1]/ratio]), add_r = 1/ratio):
                 G.remove_edge(node_1, node_2)
         # G.add_edges_from(edges)
         boundary_nodes = self.find_boundary_nodes(G)
