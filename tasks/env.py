@@ -22,6 +22,7 @@ import cv2
 from .control_manager import PID_controller, Control_module
 from .scene_manager import Scene_controller
 from .memory_manager import ImageMemoryManager
+from .graph_manager import Graph_manager
 
 sim_config = {
     "renderer": "RayTracedLighting",
@@ -286,6 +287,9 @@ class CLGRCENV(gym.Env):
             }
 )
         # !!!!!init graph
+        self.use_graph = asdict(config).get('graph', None)
+        if self.use_graph:
+            self.graph_module = Graph_manager()
         return
     
     def get_success_rate(self, observation, terminated, sources, source="Nan"):
@@ -503,7 +507,6 @@ class CLGRCENV(gym.Env):
         reward, terminated, truncated = self.get_reward(gt_observations)
         sources = ["time_out", "collision", "Nan"]
         source = "Nan"
-
         if not terminated:
             if self._is_timeout():
                 truncated = True #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!здесь почему-то был false
@@ -659,8 +662,25 @@ class CLGRCENV(gym.Env):
         with torch.no_grad():
             text_features = self.clip_model.encode_text(text)
         # graph_embedding = self.get_graph_embedding()!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if self.use_graph:
+            graph_embedding = self.graph_module.get_graph_embedding()
         # print("embedding ", type(graph_embedding))
         # print(img[0])
+        if self.use_graph:
+            self.memory.add(self.tensor_to_pil(img[0]))
+            mem = self.memory.get_embedding()
+            return np.concatenate(
+            [
+                jetbot_linear_velocity,
+                jetbot_angular_velocity,
+                # self.img_goal_emb[0].cpu(),
+                img_current_emb_0[0].cpu(),
+                img_current_emb_1[0].cpu(),
+                text_features[0].cpu(),
+                # mem[0].cpu(),
+                graph_embedding.cpu().detach().numpy(),
+            ]
+        )
         if self.use_memory:
             self.memory.add(self.tensor_to_pil(img[0]))
             mem = self.memory.get_embedding()
