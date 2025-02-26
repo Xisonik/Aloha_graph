@@ -67,7 +67,7 @@ class Scene_controller:
             goal_position = poses_bowl[num_of_envs]
 
         goal_position = poses_bowl[num_of_envs]
-        return goal_position, poses_bowl
+        return goal_position, poses_bowl, num_of_envs
 
     def get_robot_position(self, x_goal, y_goal, traning_radius=0, traning_angle=0):
         # return [4,3,0], -np.pi
@@ -99,7 +99,7 @@ class Scene_controller:
             n = np.random.randint(2)
             
             quadrant = self._get_quadrant(nx, ny, to_goal_vec)
-            return [4,3,0], quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
+            # return [4,3,0], quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
             if self.no_intersect_with_obstacles(robot_pos[0:2], 0.25) and robot_pos[0] < 7.5-self.robot_r and robot_pos[0] > 0.5+self.robot_r and robot_pos[1] < 5.5-self.robot_r and robot_pos[1] > 0.5+self.robot_r:
                 n = np.random.randint(2)
                 return robot_pos, quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
