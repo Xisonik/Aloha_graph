@@ -18,6 +18,7 @@ import gzip
 import pickle
 import argparse
 import json
+import open_clip
 
 class Graph_manager():
     def __init__(self, config = MainConfig()):
@@ -36,33 +37,71 @@ class Graph_manager():
         if (not self.eval and not self.evalp) or self.learn_emb:
             self.embedding_optimizer = optim.Adam(self.embedding_net.parameters(), lr=0.001)
 
-    def get_graph_embedding(self):
-        with open(general_path + '/img/goal_bowl.png', "rb") as file:
-            objects = pickle.load(file)
+    # Load open_clip model and processor
+    def load_clip_model(self):
+        # Choose model and weights
+        model_name = "EVA02-B-16"
+        pretrained = "merged2b_s8b_b131k"
 
-        # Read bbox info
-        bbox_path = general_path + "/scene/scene_test/0"
-        with open(bbox_path, "r") as flie:
-            bbox_pose = json.load(flie)
+        # Load model and processor
+        clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(model_name, pretrained)
+        clip_model = clip_model.to("cuda")  # Move model to GPU
+        clip_tokenizer = open_clip.get_tokenizer(model_name)
 
-        features = []
+        return clip_model, clip_tokenizer
 
-        current_bowl_pose = self.poses_bowl[self.num_of_envs]
-        
-        id_order = [7, 0, 1, 2, 8]
-        for target_id in id_order:
-            for item in bbox_pose:
-                if item["id"] == target_id:
-                    clip_descriptor = objects[str(target_id)]
-                    bbox_extent = np.array([item['size']["x"], item['size']["y"], item['size']["z"]])
-                    if target_id == 8:
-                        bbox_center = self.poses_bowl[self.num_of_envs]
-                    else:
-                        bbox_center = np.array([item['center']['position']["x"], item['center']['position']["y"], item['center']['position']["z"]])
-                    object_feature = np.concatenate([clip_descriptor, bbox_extent, bbox_center])  # (512 + 3 + 3 = 518)
-                    features.append(object_feature)
+    # Generate CLIP embedding for text description
+    def get_clip_embedding(self, text, model, tokenizer):
+        # Tokenize and encode text
+        text_tokens = tokenizer(text).to("cuda")  # Move input to GPU
+        with torch.no_grad():
+            text_features = model.encode_text(text_tokens)  # Generate text embedding
+            text_features /= text_features.norm(dim=-1, keepdim=True)  # Normalize
+        return text_features.squeeze(0).cpu()  # Return 512-dimensional vector and move to CPU
 
-        # to tensor (num_object, 518)
-        object_features = torch.tensor(features, dtype=torch.float32).to(self.device)  # (7, 518)
+    # Read JSON file and generate feature tensor
+    def json_to_tensor(self, json_file, model, tokenizer):
+        # Read JSON file
+        with open(json_file, "r") as f:
+            data = json.load(f)
+
+        # Initialize list to store features of all objects
+        object_features = []
+
+        # Iterate over each object
+        for obj_key, obj_data in data.items():
+            # Extract bbox_extent, bbox_center, bbox_volume
+            bbox_extent = torch.tensor(obj_data["bbox_extent"], dtype=torch.float32)  # 3 dimensions
+            bbox_center = torch.tensor(obj_data["bbox_center"], dtype=torch.float32)  # 3 dimensions
+            bbox_volume = torch.tensor([obj_data["bbox_volume"]], dtype=torch.float32)  # 1 dimension
+
+            # Generate CLIP embedding for text description
+            object_tag = obj_data["object_tag"]
+            text_embedding = self.get_clip_embedding(object_tag, model, tokenizer)  # 512 dimensions
+
+            # Concatenate all features into a 519-dimensional (or 518) vector
+            # features = torch.cat([bbox_extent, bbox_center, bbox_volume, text_embedding], dim=0)
+            features = torch.cat([bbox_extent, bbox_center, text_embedding], dim=0) # this one is 518
+            object_features.append(features)
+
+        # Stack features of all objects into a tensor
+        object_tensor = torch.stack(object_features)  # Shape: (num_objects, 519 or 518)
+        return object_tensor
+
+    def get_graph_embedding(self, num_of_envs=0):
+        # Load open_clip model
+        clip_model, clip_tokenizer = self.load_clip_model()
+
+        # JSON file path
+        json_file = general_path + "/scene_graph_2_26/"+ str(num_of_envs+1) +".json"  # Replace with your JSON file path
+
+        # Generate feature tensor
+        object_tensor = self.json_to_tensor(json_file, clip_model, clip_tokenizer)
+
+        # Print results
+        print("Object tensor shape:", object_tensor.shape)  # Output: (num_objects, 518)
+        print("Object tensor:", object_tensor)
+
+        object_features = object_tensor
 
         return object_features
