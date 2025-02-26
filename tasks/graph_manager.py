@@ -20,7 +20,12 @@ import argparse
 import json
 
 class Graph_manager():
-    def __init__(self):
+    def __init__(self, config = MainConfig()):
+        self.config = config
+        self.device  = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.eval = asdict(config).get('eval', None)
+        self.evalp = asdict(config).get('eval_print', None)
+        self.learn_emb = False
         self.init_embedding_nn()
 
     def init_embedding_nn(self):
@@ -32,11 +37,11 @@ class Graph_manager():
             self.embedding_optimizer = optim.Adam(self.embedding_net.parameters(), lr=0.001)
 
     def get_graph_embedding(self):
-        with open(objects_path, "rb") as file:
+        with open(general_path + '/img/goal_bowl.png', "rb") as file:
             objects = pickle.load(file)
 
         # Read bbox info
-        bbox_path = <your_json_path>
+        bbox_path = general_path + "/scene/scene_test/0"
         with open(bbox_path, "r") as flie:
             bbox_pose = json.load(flie)
 
