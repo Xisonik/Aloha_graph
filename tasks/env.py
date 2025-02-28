@@ -586,7 +586,7 @@ class CLGRCENV(gym.Env):
                 self.eval_step_angle = 0
                 self.eval_step += 1
         else:
-            start = 0.73
+            start = 1.1
             self.traning_radius = start + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
             self.traning_angle = self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
         print("eval reset: ", self.eval)
@@ -600,7 +600,7 @@ class CLGRCENV(gym.Env):
             print("radius is ", self.traning_radius)
             eval = 1 if self.eval else 0
             r = asdict(self.config).get('eval_radius', None)
-            start = 1.1
+            start = 1.4
             random_angle = 0#np.random.rand()*2*np.pi
             self.traning_radius = start + eval*r + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
             self.traning_angle = eval*random_angle + self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
