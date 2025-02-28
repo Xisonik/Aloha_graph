@@ -140,3 +140,7 @@ insert in line 234 elif
                 f"Expects `truncated` signal to be a boolean, actual type: {type(truncated)}"
             )
 ```
+assets link:
+```
+https://drive.google.com/drive/folders/1waC17p9AvrMe-7hTv8rpWKMKoUm4Mwyl?usp=drive_link
+```
