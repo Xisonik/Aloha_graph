@@ -203,6 +203,13 @@ class CLGRCENV(gym.Env):
             self.memory = ImageMemoryManager()
         if self.use_memory:
             shape_size += 2048
+
+        self.use_graph = asdict(config).get('graph', None)
+        if self.use_graph:
+            self.graph_module = Graph_manager()
+        if self.use_graph:
+            shape_size += 518
+
         self.observation_space = spaces.Box(low=-1000000000, high=1000000000, shape=(shape_size,), dtype=np.float32)
 
         self.max_velocity = 1.2
@@ -275,6 +282,7 @@ class CLGRCENV(gym.Env):
 
         self.scene_controller = Scene_controller()
         self.controle_module = Control_module()
+        self.graph_embedding = self.graph_module.get_graph_embedding(self.num_of_envs)
 
         light_1 = prim_utils.create_prim(
             "/World/Light_1",
@@ -285,11 +293,8 @@ class CLGRCENV(gym.Env):
                 "inputs:intensity": 5e7,
                 "inputs:color": (1.0, 1.0, 1.0)
             }
-)
-        # !!!!!init graph
-        self.use_graph = asdict(config).get('graph', None)
-        if self.use_graph:
-            self.graph_module = Graph_manager()
+    )
+        
         return
     
     def get_success_rate(self, observation, terminated, sources, source="Nan"):
@@ -549,7 +554,7 @@ class CLGRCENV(gym.Env):
         self.event = np.random.choice(self.events)
         self.num_of_step = self.num_of_step + 1
         
-        self.goal_position, self.get_target_positions = self.scene_controller.get_target_position(self.event, self.eval, self.evalp,)
+        self.goal_position, self.get_target_positions, self.num_of_envs = self.scene_controller.get_target_position(self.event, self.eval, self.evalp,)
         if 0:
             self.goal_cube.set_world_pose(self.goal_position)
         else:
@@ -592,6 +597,7 @@ class CLGRCENV(gym.Env):
 
         correct_position = False
         while not correct_position:
+            print("radius is ", self.traning_radius)
             eval = 1 if self.eval else 0
             r = asdict(self.config).get('eval_radius', None)
             start = 1.1
@@ -599,16 +605,18 @@ class CLGRCENV(gym.Env):
             self.traning_radius = start + eval*r + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
             self.traning_angle = eval*random_angle + self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
             new_pos, new_angle, correct_position = self.scene_controller.get_robot_position(self.goal_position[0], self.goal_position[1], self.traning_radius, self.traning_angle)
-            if not correct_position:
-                self.amount_radius_change += 1
+            # if not correct_position:
+            #     self.amount_radius_change += 1
+
 
         self.jetbot.set_world_pose(new_pos ,get_quaternion_from_euler(new_angle))
 
         get_prob_true = lambda x: np.random.rand() <= x
+        use_control = 1 if asdict(self.config).get('control', None) else 0
         if self.eval or self.evalp:
             self.demonstrate = get_prob_true(-1)
         else:
-            self.demonstrate = get_prob_true(0.5)
+            self.demonstrate = use_control*get_prob_true(0.4)
         print("demonstrate: ", self.demonstrate)
         if self.demonstrate:
             self.controle_module.update(new_pos, self.goal_position, self.get_target_positions)
@@ -616,6 +624,9 @@ class CLGRCENV(gym.Env):
 
         memory = psutil.virtual_memory()
         print(f"Используется: {memory.used / (1024**3):.2f} GB")
+        if self.use_graph:
+            self.graph_embedding = self.graph_module.get_graph_embedding(self.num_of_envs)
+
         return observations, info
     
     def get_path(self):
@@ -654,21 +665,18 @@ class CLGRCENV(gym.Env):
             img_current_emb_1 = self.clip_model.encode_image(img_current_1)
         event = self.event,
         if event == 1:
-            s = "wall - 1"
+            s = "go to the bowl wall with 1 color"
         else:
-            s = "wall - 2"
+            s = "go to the bowl wall with 2 color"
 
         text = clip.tokenize([s]).to(self.device)
         with torch.no_grad():
             text_features = self.clip_model.encode_text(text)
         # graph_embedding = self.get_graph_embedding()!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if self.use_graph:
-            graph_embedding = self.graph_module.get_graph_embedding()
+        
         # print("embedding ", type(graph_embedding))
         # print(img[0])
         if self.use_graph:
-            self.memory.add(self.tensor_to_pil(img[0]))
-            mem = self.memory.get_embedding()
             return np.concatenate(
             [
                 jetbot_linear_velocity,
@@ -678,7 +686,7 @@ class CLGRCENV(gym.Env):
                 img_current_emb_1[0].cpu(),
                 text_features[0].cpu(),
                 # mem[0].cpu(),
-                graph_embedding.cpu().detach().numpy(),
+                self.graph_embedding[0].cpu().detach().numpy(),
             ]
         )
         if self.use_memory:
