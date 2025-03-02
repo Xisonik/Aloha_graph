@@ -208,9 +208,9 @@ class CLGRCENV(gym.Env):
         if self.use_graph:
             self.graph_module = Graph_manager()
         if self.use_graph:
-            shape_size += 518
+            shape_size += 5698
 
-        self.observation_space = spaces.Box(low=-1000000000, high=1000000000, shape=(shape_size,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-1000000000, high=1000000000, shape=(2060,), dtype=np.float32)
 
         self.max_velocity = 1.2
         self.max_angular_velocity = math.pi*0.4
@@ -282,7 +282,8 @@ class CLGRCENV(gym.Env):
 
         self.scene_controller = Scene_controller()
         self.controle_module = Control_module()
-        self.graph_embedding = self.graph_module.get_graph_embedding(self.num_of_envs)
+        if self.use_graph:
+            self.graph_embedding = self.graph_module.get_graph_embedding(self.num_of_envs)
 
         light_1 = prim_utils.create_prim(
             "/World/Light_1",
@@ -565,44 +566,46 @@ class CLGRCENV(gym.Env):
                     usd_path=asdict(self.config).get('cup_usd_path', None),
                 )
 
-        if self.eval:
-            n = np.random.randint(2)
-            phi = asdict(self.config).get('eval_angle', None)
-            r = asdict(self.config).get('eval_radius', None)
-            self.traning_angle = ((-1)**n)*phi
-            self.traning_radius = r
-        elif self.evalp and not self.demonstrate:
-            n = np.random.randint(2)
-            phi = self.eval_step_angle*self.eval_dangle
-            r = self.eval_step*self.eval_dt
-            self.traning_angle = ((-1)**n)*phi
-            self.traning_radius = r
-            step_angle_update = 20
-            if (self.num_of_step % (step_angle_update-1) == 0) and self.num_of_step > 1:
-                self.eval_write = 1
-            if self.num_of_step % step_angle_update == 0:
-                self.eval_step_angle += 1
-            if self.max_trining_angle + np.pi/9 < phi:
-                self.eval_step_angle = 0
-                self.eval_step += 1
-        else:
-            start = 1.1
-            self.traning_radius = start + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
-            self.traning_angle = self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
-        print("eval reset: ", self.eval)
-        print("self.traning_radius",  self.traning_radius)
-        print("self.traning_angle", self.traning_angle)
+        # if self.eval:
+        #     n = np.random.randint(2)
+        #     phi = asdict(self.config).get('eval_angle', None)
+        #     r = asdict(self.config).get('eval_radius', None)
+        #     self.traning_angle = ((-1)**n)*phi
+        #     self.traning_radius = r
+        # elif self.evalp and not self.demonstrate:
+        #     n = np.random.randint(2)
+        #     phi = self.eval_step_angle*self.eval_dangle
+        #     r = self.eval_step*self.eval_dt
+        #     self.traning_angle = ((-1)**n)*phi
+        #     self.traning_radius = r
+        #     step_angle_update = 20
+        #     if (self.num_of_step % (step_angle_update-1) == 0) and self.num_of_step > 1:
+        #         self.eval_write = 1
+        #     if self.num_of_step % step_angle_update == 0:
+        #         self.eval_step_angle += 1
+        #     if self.max_trining_angle + np.pi/9 < phi:
+        #         self.eval_step_angle = 0
+        #         self.eval_step += 1
+        # else:
+        #     start = 1.1
+        #     self.traning_radius = start + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
+        #     self.traning_angle = self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
+        # print("eval reset: ", self.eval)
+        # print("self.traning_radius",  self.traning_radius)
+        # print("self.traning_angle", self.traning_angle)
         if self.num_of_step > 0:
             self.change_reward_mode()
 
         correct_position = False
+        tuning = asdict(self.config).get('tuning', None)
+        r = asdict(self.config).get('eval_radius', None)
         while not correct_position:
             print("radius is ", self.traning_radius)
             eval = 1 if self.eval else 0
-            r = asdict(self.config).get('eval_radius', None)
-            start = 1.4
+            add_r = 1 if self.eval or tuning else 0
+            
             random_angle = 0#np.random.rand()*2*np.pi
-            self.traning_radius = start + eval*r + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
+            self.traning_radius = add_r*r + self.amount_radius_change*self.max_traning_radius/self.max_amount_radius_change
             self.traning_angle = eval*random_angle + self.amount_angle_change*self.max_trining_angle/self.max_amount_angle_change
             new_pos, new_angle, correct_position = self.scene_controller.get_robot_position(self.goal_position[0], self.goal_position[1], self.traning_radius, self.traning_angle)
             # if not correct_position:
@@ -686,7 +689,7 @@ class CLGRCENV(gym.Env):
                 img_current_emb_1[0].cpu(),
                 text_features[0].cpu(),
                 # mem[0].cpu(),
-                self.graph_embedding[0].cpu().detach().numpy(),
+                self.graph_embedding.cpu().detach().numpy(),
             ]
         )
         if self.use_memory:
