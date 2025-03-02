@@ -43,11 +43,11 @@ class Scene_controller:
                 if  np.abs(np.linalg.norm(obstacle["position"] - robot_pos)) < (self.robot_r + obstacle["radius"] + add_r):
                 # print(np.linalg.norm(pos_obstacle - robot_pos))
                     no_interect = False
-                    print("interect with obst shape ", obstacle["shape"])
+                    # print("interect with obst shape ", obstacle["shape"])
             elif obstacle["shape"] == "cube" or obstacle["shape"] == "table":
                 if  np.abs(np.linalg.norm(obstacle["position"][0] - robot_pos[0])) < (self.robot_r + obstacle["len_x"] + add_r) and np.abs(np.linalg.norm(obstacle["position"][1] - robot_pos[1])) < (self.robot_r + obstacle["len_y"] + add_r):
                     no_interect = False
-                    print("interect with obst shape ", obstacle["shape"])
+                    # print("interect with obst shape ", obstacle["shape"])
             else:
                 print("there is no obstacle of a given shape", obstacle["shape"])
         
@@ -69,9 +69,9 @@ class Scene_controller:
         goal_position = poses_bowl[num_of_envs]
         return goal_position, poses_bowl, num_of_envs
 
-    def get_robot_position(self, x_goal, y_goal, traning_radius=0, traning_angle=0):
+    def get_robot_position(self, x_goal, y_goal, traning_radius=0, traning_angle=0, tuning=0):
         # return [4,3,0], -np.pi
-        traning_radius_start = 0
+        traning_radius_start = 1.2
         k = 0
         self.change_line += 1
         reduce_r = 1
@@ -103,8 +103,8 @@ class Scene_controller:
             if self.no_intersect_with_obstacles(robot_pos[0:2], 0.25) and robot_pos[0] < 7.5-self.robot_r and robot_pos[0] > 0.5+self.robot_r and robot_pos[1] < 5.5-self.robot_r and robot_pos[1] > 0.5+self.robot_r:
                 n = np.random.randint(2)
                 return robot_pos, quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
-            elif k >= 300:
-                print("can't get correct robot position: ", robot_pos, quadrant*np.arccos(cos_angle) + reduce_phi*traning_angle, reduce_r)
+            elif k >= 1000:
+                print("can't get correct robot position: ", robot_pos, quadrant*np.arccos(cos_angle) + reduce_phi*traning_angle, reduce_r*traning_radius)
                 return 0, 0, False
                   
     def _get_quadrant(self, nx, ny, vector):
