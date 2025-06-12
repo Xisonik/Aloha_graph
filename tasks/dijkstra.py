@@ -30,3 +30,10 @@ shortest_paths = dijkstra_all_paths(G, target_nodes)
 for target, paths in shortest_paths.items():
     for start, path in paths.items():
         print(f"Путь из {start} -> {target}: {path}")
+
+path = shortest_paths.get((3,3), {}).get((0,1), None)
+
+if path:
+    print(f"Путь из {(0,1)} в {(3,3)}: {path}")
+else:
+    print(f"Путь из {start} в {target} не найден.")
