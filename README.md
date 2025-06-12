@@ -1,6 +1,33 @@
-# Aloha_graph
+# Установка:
+```
+alias PYTHON_PATH=~/.local/share/ov/pkg/isaac_sim-*/python.sh
+```
+1. Скачать папки assets, model и scene по ссылке https://disk.yandex.com/d/HlCCxiESonoKzQ в репозиторий.
+2. Установить необходимые модули:
+   ```
+   ./python.sh -m pip install ftfy regex tqdmip
+   ./python.sh -m pip install git+https://github.com/openai/CLIP.git
+   ./python.sh -m pip install ultralytics
+   ```
+3. Изменить общий путь до проекта в переменной general_path расположенной в файле configs/main_config.py
+# Запуск пайплайна:
+## обучение:
+1. В переменной расположенной eval в файле configs/main_config.py установить значение False
+```
+PYTHON_PATH train.py
+```
+## инференс:
+В в файле configs/main_config.py
+1. выбрать в переменной load_policy модель, которую необходимо протестировать;
+2. eval = True
+3. задать радиус и угол начального отклонения eval_radius, eval_angle
+```
+PYTHON_PATH train.py
+```
+# Работа с пайплайном:
+в файле configs/main_cnfig.py в переменной general_path оределить путь до директории проекта
  
-изменить:
+# изменить для работы с модулем контроля:
 /home/kit/.local/share/ov/pkg/isaac-sim-4.1.0/kit/python/lib/python3.10/site-packages/stable_baselines3/common/off_policy_algorithm.py
 
 line 559
