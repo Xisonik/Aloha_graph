@@ -229,7 +229,7 @@ class Control_module:
                 arr = range(len(obstacles))
                 results = []
 
-                for r in range(1, len(arr) + 1):
+                for r in range(5, len(arr) + 1):
                     for combo in combinations(arr, r):
                         combined = ''.join(str(x) for x in combo)
                         results.append(combined)
@@ -325,7 +325,7 @@ class Control_module:
             arr = range(len(obstacles))
             results = []
 
-            for r in range(1, len(arr) + 1):
+            for r in range(5, len(arr) + 1):
                 for combo in combinations(arr, r):
                     combined = ''.join(str(x) for x in combo)
                     results.append(combined)
