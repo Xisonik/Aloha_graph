@@ -102,7 +102,7 @@ class CLGRCENV(gym.Env):
         rendering_dt=1.0 / 60.0,
         max_episode_length=4096,
         seed=10,
-        MAX_SR=50,
+        MAX_SR=100,
         test=False,
         reward_mode=0
     ) -> None:
@@ -339,6 +339,7 @@ class CLGRCENV(gym.Env):
         self.obstacles_prop = None
         self.scene_graphs_cache = {}
         self.max_number_of_obstacles = None
+        self.SR = 0
 
         return
 
@@ -383,6 +384,7 @@ class CLGRCENV(gym.Env):
                 SR_distribution[event] = SR_distribution[event]/step_distribution[event]
 
         SR = SR/len(steps_array)
+        self.SR = SR
         self.prev_SR = SR_distribution
         return  SR, SR_distribution, FR_distribution
     
@@ -479,7 +481,7 @@ class CLGRCENV(gym.Env):
 
     def _get_terminated(self, observation, RM):
         achievements = dict.fromkeys(self.reward_modes, False)
-        if observation["current_dist_to_goal"] < 1.1:
+        if observation["current_dist_to_goal"] < 1.3:
             achievements["move"] = True
         if RM > 0 and achievements["move"] and abs(observation["orientation_error"]) < 15:
             achievements["rotation"] = True
@@ -600,12 +602,11 @@ class CLGRCENV(gym.Env):
         print("current level is ", level)
         if self.max_number_of_obstacles is None:
             _, obstacles, _ = self.scene_controller.get_obstacles(-1)
-        # _, goal_positions , _ = self.scene_controller.get_target_position()
             self.max_number_of_obstacles = len(obstacles)
-        k = random.randint(1, self.max_number_of_obstacles)
+        k = random.randint(5, self.max_number_of_obstacles)
         return k
 
-    def set_env(self, config, goal_position=np.array([1, 1, 0.0])):
+    def set_env(self, config, key, obstacles_prop,  goal_position=np.array([1, 1, 0.0])):
         from omni.isaac.core.objects import VisualCuboid, FixedCuboid
         from omni.isaac.core.utils.nucleus import get_assets_root_path
         from omni.isaac.core.utils.prims import create_prim, define_prim, delete_prim
@@ -625,11 +626,7 @@ class CLGRCENV(gym.Env):
         # Базовый путь к USD-файлам
         base_path = "/home/kit/.local/share/ov/pkg/isaac-sim-4.1.0/standalone_examples/Aloha_graph/Aloha/assets/scenes/obstacles"
         # Генерация конфигурации сцены
-        if self.stept % 50 == 0 or self.stept==0:
-            self.stept = 1
-            self.key = self.generate_random_key()
-        self.stept = self.stept + 1
-        obstacles_prop = self.scene_controller.generate_obstacles(key=self.key)
+        self.key = key
         self.obstacles_prop = obstacles_prop
         scene_config = {
             "goal_position": goal_position.tolist(),
@@ -802,14 +799,24 @@ class CLGRCENV(gym.Env):
         self.event = np.random.choice(self.events)
         self.num_of_step += 1
 
-        self.goal_position, self.target_positions, self.num_of_envs = self.scene_controller.get_target_position()
-        self.set_env(config=self.config, goal_position=self.goal_position)
-        correct_position = False
+        self.stept = self.stept + 1
+        
         tuning = asdict(self.config).get('tuning', None)
         r = asdict(self.config).get('eval_radius', None)
         if self.traning_radius > 2.5 + self.level*2:
             self.level += 1
+        correct_position = False
+        second_try = False
+        reset_obstacles = False
         while not correct_position:
+            if self.stept % 10 == 0 or self.stept==0 or second_try:
+                key = self.generate_random_key()
+                self.key = key
+                obstacles_prop = self.scene_controller.generate_obstacles(key=self.key)
+                self.obstacles_prop = obstacles_prop
+                self.goal_position, self.target_positions, self.num_of_envs = self.scene_controller.get_target_position()
+                self.stept = 1
+                reset_obstacles = True
             print("radius is ", self.traning_radius)
             eval = 1 if self.eval else 0
             add_r = 1 if tuning else 0
@@ -819,6 +826,9 @@ class CLGRCENV(gym.Env):
             self.traning_radius = add_r * r + r * eval + self.amount_radius_change * self.max_traning_radius / self.max_amount_radius_change
             self.traning_angle = eval * random_angle + self.amount_angle_change * self.max_trining_angle / self.max_amount_angle_change
             new_pos, new_angle, correct_position = self.scene_controller.get_robot_position(self.goal_position[0], self.goal_position[1], self.traning_radius, self.traning_angle)
+            second_try = True
+            if reset_obstacles and correct_position:
+                self.set_env(config=self.config, obstacles_prop=obstacles_prop, key=key, goal_position=self.goal_position)
 
         self.jetbot.set_world_pose(new_pos, get_quaternion_from_euler(new_angle))
 
@@ -828,7 +838,7 @@ class CLGRCENV(gym.Env):
         if (self.eval or self.evalp) and not self.imitation_part:
             self.demonstrate = get_prob_true(-1)
         else:
-            self.demonstrate = use_control * get_prob_true(0.3 + 1 * self.imitation_part)
+            self.demonstrate = use_control * get_prob_true(min(max(1-self.SR, 0.6), 0.1) + self.imitation_part)
         print("demonstrate: ", self.demonstrate)
         if self.demonstrate:
             self.controle_module.update(new_pos, self.goal_position, self.target_positions, scene_controller=self.scene_controller, key=self.key)
@@ -1126,7 +1136,7 @@ class CLGRCENV(gym.Env):
         """
         _, _, obstacles_id = self.scene_controller.get_obstacles()
         # _, _, obstacles = self.scene_controller.get_obstacles()
-        _, _ , goal_position = self.scene_controller.get_target_position()
+        _, _ , goal_position = self.scene_controller.get_target_position(not_change=True)
         key = ''.join(str(x) for x in sorted(obstacles_id))
         gr = self.scene_graphs_cache[(goal_position, key)]
 
