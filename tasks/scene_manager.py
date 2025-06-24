@@ -25,20 +25,22 @@ class Scene_controller:
         self.external_management = False
         self.possible_positions_for_obstacles = None
         self.id_obstacles = None
+        self.goal_position = None
 
     def generate_positions_for_contole_module(self, key=0, positions_for_obstacles=None):
         self.obstacles = []
         possible_positions_for_obstacles  = [
-            [2, 1, 0.0],
-            [2.8, 5, 0.0],
-            # [3.4, 5, 0.0],
-            [2.8, 3.5, 0.0],
-            # [3.4, 3.5, 0.0],
-            [2.8, 2, 0.0],
+            [2.2, 1, 0.0],
+            [2.5, 5.5, 0.0],
+            [3.6, 5.5, 0.0],
+            [2.5, 3.5, 0.0],
+            [3.6, 3.5, 0.0],
+            [3, 2, 0.0],
             [4, 0.6, 0.0],
-            # [1.5, -0.5, 0.0],
+            [1.5, -0.5, 0.0],
         ]
         self.possible_positions_for_obstacles = possible_positions_for_obstacles
+        # key = -1
         if key == -1:
             key = len(possible_positions_for_obstacles)
         if key > 0:
@@ -79,14 +81,14 @@ class Scene_controller:
         intersect = False
         
         for obstacle in self.obstacles:
-            if obstacle["shape"] == "table":
-                if (np.abs(obstacle["position"][0] - robot_pos[0] + add_r) < (self.robot_r + obstacle["len_x"]) or 
-                    np.abs(obstacle["position"][1] - robot_pos[1] + add_r) < (self.robot_r + obstacle["len_y"])):
-                    intersect = True
-            elif obstacle["shape"] == "chair":
-                # Предполагаем радиус столкновения 0.5 м для стула и человека
-                if np.abs(np.linalg.norm(np.array(obstacle["position"][0:2]) - robot_pos + add_r)) < (self.robot_r + 0.35):
-                    intersect = True
+            # if obstacle["shape"] == "table":
+            #     if (np.abs(obstacle["position"][0] - robot_pos[0] + add_r) < (self.robot_r + obstacle["len_x"]) or 
+            #         np.abs(obstacle["position"][1] - robot_pos[1] + add_r) < (self.robot_r + obstacle["len_y"])):
+            #         intersect = True
+            # elif obstacle["shape"] == "chair":
+            #     # Предполагаем радиус столкновения 0.5 м для стула и человека
+            if np.abs(np.linalg.norm(np.array(obstacle["position"][0:2]) - robot_pos)) < (self.robot_r + 0.35 + add_r):
+                intersect = True
         
         return intersect
     
@@ -101,7 +103,7 @@ class Scene_controller:
         
         return intersect
 
-    def get_target_position(self):
+    def get_target_position(self,not_change=False):
         poses_bowl = [
                       np.array([-0.6, -1.1, 0.8]),
                       np.array([3.9, 0.1, 0.8]),
@@ -111,14 +113,16 @@ class Scene_controller:
                       np.array([2.5, 7.1, 0.8]),
                     #   np.array([3.5, 7.1, 0.8])
                       ]
-
+        if not_change:
+            return poses_bowl[self.goal_position], poses_bowl, self.goal_position
         goal_position = random.choice(range(len(poses_bowl)))
+        self.goal_position = goal_position
         num_of_envs = 0
         return poses_bowl[goal_position], poses_bowl, goal_position
 
     def get_robot_position(self, x_goal, y_goal, traning_radius=0, traning_angle=0, tuning=0):
         # return [4,3,0], -np.pi
-        traning_radius_start = 1.2
+        traning_radius_start = 1.308
         k = 0
         self.change_line += 1
         reduce_r = 1
@@ -131,6 +135,9 @@ class Scene_controller:
         #     self.change_line=0
         # print("reduce", reduce_r)
         # traning_radius = 0 #random.uniform(0.0, 4)
+        print("get robot position with ")
+        print("goal ", x_goal, y_goal)
+        print("r, alpha ", traning_angle, traning_radius, traning_angle)
         while True:
             k += 1
             robot_pos = np.array([x_goal, y_goal, 0.1])
@@ -147,17 +154,17 @@ class Scene_controller:
             n = np.random.randint(2)
             
             quadrant = self._get_quadrant(nx, ny, to_goal_vec)
-            # robot_pos = np.array([     2.8964,        2.17,         0.1])
-            # return [     2.8964,        2.17,         0.1], 4*np.pi/2, True #quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
-            if (not self.intersect_with_obstacles(robot_pos[0:2], 0.1)
+            # robot_pos = np.array([     1.9743,      3.2532,         0.1])
+            # return [     1.8394,      2.9004,         0.1], 4*np.pi/2, True #quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
+            if (not self.intersect_with_obstacles(robot_pos[0:2], 0.3)
                 and  ((robot_pos[0] > 1.7 and robot_pos[0] < 4.3 and robot_pos[1] > 1.4 and robot_pos[1] < 6.4)
                 or (robot_pos[0] > 0 and robot_pos[0] < 3 and robot_pos[1] > -1 and robot_pos[1] < 0.8))):
-                print("robot_pos", robot_pos, traning_radius)
+                print("robot_pos", robot_pos, traning_radius, quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle)
                 print("obstacles in get robot pos", self.obstacles)
                 n = np.random.randint(2)
                 return robot_pos, quadrant*np.arccos(cos_angle) + ((-1)**n)*reduce_phi*traning_angle, True
             elif k >= 1000:
-                print("can't get correct robot position: ", x_goal, y_goal, robot_pos, reduce_r*traning_radius)
+                print("can't get correct robot position: ", x_goal, y_goal, traning_radius_start+reduce_r*traning_radius)
                 return 0, 0, False
                   
     def _get_quadrant(self, nx, ny, vector):
