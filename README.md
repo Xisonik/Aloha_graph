@@ -1,7 +1,3 @@
-Хорошо 🙌 Ниже — перевод твоего README на английский язык в аккуратном формате. Я сохранил структуру, блоки кода и заголовки.
-
----
-
 # Video:
 
 ```
@@ -296,6 +292,3 @@ Main stages:
 
 The pipeline integrates simulation, RL, and demonstration control for robot navigation. `CLGRCENV` coordinates environment dynamics, `Scene_controller` manages scenes, `Control_module` provides demonstration control. Observations fuse visual, kinematic, and graph-based features, supporting both RL and imitation learning. The localization module is available for future integration.
 
----
-
-Хочешь, я ещё сделаю тебе компактную **английскую версию README.md в GitHub-стиле** (без длинного теоретического описания, только установка + запуск + краткое объяснение)?
